@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="mb-4">Dashboard</h2>
+
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Energy Statistics</span>
+                <button id="refreshChart" class="btn btn-sm btn-outline-primary">↻</button>
+            </div>
+            <div class="card-body">
+                <canvas id="energyChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Weather Forecast</span>
+                <button id="refreshWeather" class="btn btn-sm btn-outline-primary">↻</button>
+            </div>
+            <div class="card-body">
+                <ul id="weatherList" class="list-group small"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">Robot Control</div>
+    <div class="card-body">
+        <div class="btn-group" role="group">
+            <button class="btn btn-success robot-cmd" data-cmd="start_clean">Start Cleaning</button>
+            <button class="btn btn-danger robot-cmd" data-cmd="stop_clean">Stop Cleaning</button>
+            <button class="btn btn-secondary robot-cmd" data-cmd="status">Get Status</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
