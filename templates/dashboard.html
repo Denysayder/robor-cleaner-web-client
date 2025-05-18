@@ -18,10 +18,32 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Weather Forecast</span>
+                <button id="editLocation" class="btn btn-sm btn-outline-secondary ms-2"><img src="../static/img/icon_position.svg" alt="" style="max-height: 15px;"></button>
                 <button id="refreshWeather" class="btn btn-sm btn-outline-primary">↻</button>
             </div>
             <div class="card-body">
                 <ul id="weatherList" class="list-group small"></ul>
+                <div class="modal fade" id="locationModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog"><div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Set Location</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                        <div class="mb-3">
+                          <label for="latInput" class="form-label">Latitude</label>
+                          <input type="number" step="0.0001" id="latInput" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                          <label for="lonInput" class="form-label">Longitude</label>
+                          <input type="number" step="0.0001" id="lonInput" class="form-control">
+                        </div>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" id="saveLocation">Save</button>
+                      </div>
+                    </div></div>
+                  </div>
             </div>
         </div>
     </div>
@@ -38,4 +60,10 @@
     </div>
 </div>
 
+<div class="card mt-4">
+    <div class="card-header">Robot Camera</div>
+    <div class="card-body text-center">
+        <img id="robotStream" src="{{ url_for('stream.video_feed') }}" class="img-fluid border rounded">
+    </div>
+</div>
 {% endblock %}

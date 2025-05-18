@@ -7,18 +7,20 @@ from config import Config
 from models import db
 
 
-def weather_forecast():
+def weather_forecast(lat=None, lon=None):
+    lat = lat or Config.WEATHER_LAT
+    lon = lon or Config.WEATHER_LON
     row = db.session.execute(
         text(
             "SELECT payload, fetched_at FROM weather_cache "
             "WHERE lat=:lat AND lon=:lon LIMIT 1"
         ),
-        {"lat": Config.WEATHER_LAT, "lon": Config.WEATHER_LON},
+        {"lat": lat, "lon": lon},
     ).first()
     if row and datetime.utcnow() - row.fetched_at < timedelta(minutes=30):
         return json.loads(row.payload)
     url = Config.WEATHER_API_URL.format(
-        lat=Config.WEATHER_LAT, lon=Config.WEATHER_LON
+        lat=lat, lon=lon
     )
     params = {"apikey": Config.WEATHER_API_KEY} if Config.WEATHER_API_KEY else {}
     resp = requests.get(url, params=params, timeout=5)
@@ -32,8 +34,8 @@ def weather_forecast():
         ),
         {
             "fetched_at": datetime.utcnow(),
-            "lat": Config.WEATHER_LAT,
-            "lon": Config.WEATHER_LON,
+            "lat": lat,
+            "lon": lon,
             "payload": json.dumps(data),
         },
     )

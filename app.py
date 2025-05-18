@@ -1,4 +1,3 @@
-# app.py
 from functools import wraps
 from datetime import datetime
 import json
@@ -18,17 +17,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 from models import db, User, CleaningLog
 from services import weather_forecast, publish_robot, chart_data
+from stream import bp as stream_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.register_blueprint(stream_bp)
 
 @app.context_processor
 def inject_now():
     return {"datetime": datetime}
 
 db.init_app(app)
-redis_conn = redis.from_url(app.config["REDIS_URL"])
-
+redis_conn = redis.from_url(app.config["REDIS_URL"], ssl_cert_reqs=None)
 
 def login_required(fn):
     @wraps(fn)
@@ -36,18 +36,14 @@ def login_required(fn):
         if "user_id" not in session:
             return redirect(url_for("login_page"))
         return fn(*args, **kwargs)
-
     return wrapper
-
 
 with app.app_context():
     db.create_all()
 
-
 @app.route("/")
 def index() -> str:
     return redirect(url_for("dashboard"))
-
 
 @app.route("/register", methods=["GET", "POST"])
 def register_page():
@@ -67,7 +63,6 @@ def register_page():
         return redirect(url_for("dashboard"))
     return render_template("register.html")
 
-
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     if request.method == "POST":
@@ -80,32 +75,29 @@ def login_page():
         return redirect(url_for("dashboard"))
     return render_template("login.html")
 
-
 @app.route("/logout")
 def logout() -> str:
     session.pop("user_id", None)
     return redirect(url_for("login_page"))
-
 
 @app.route("/dashboard")
 @login_required
 def dashboard() -> str:
     return render_template("dashboard.html")
 
-
 @app.route("/api/weather")
 @login_required
 def api_weather():
-    forecast = weather_forecast()
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    forecast = weather_forecast(lat, lon)
     return jsonify(forecast)
-
 
 @app.route("/api/chart-data")
 @login_required
 def api_chart_data():
     data = chart_data()
     return jsonify(data)
-
 
 @app.route("/api/robot", methods=["POST"])
 @login_required
@@ -124,7 +116,6 @@ def api_robot():
     db.session.commit()
     return jsonify({"status": "ok"}), 200
 
-
 if __name__ == "__main__":
     app.secret_key = Config.SECRET_KEY
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)
