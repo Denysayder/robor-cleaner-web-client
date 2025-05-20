@@ -88,13 +88,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.querySelectorAll(".robot-cmd").forEach(btn => {
         btn.addEventListener("click", async () => {
-            btn.disabled = true;
-            const res = await sendRobotCommand(btn.dataset.cmd);
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                alert(err.error || "Error");
+        const cmd = btn.dataset.cmd;
+
+        try {
+            const resp = await fetch("/api/robot", {
+            method : "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept"      : "application/json"
+            },
+            body   : JSON.stringify({ command: cmd })
+            });
+
+            if (!resp.ok) {
+            throw new Error(await resp.text());
             }
-            btn.disabled = false;
+        } catch (err) {
+            confirm("Error");
+            console.error(err);
+            alert(`Ошибка: ${err.message}`);
+        }
         });
     });
 
