@@ -42,7 +42,7 @@ def weather_forecast(lat=None, lon=None):
 
 def publish_robot(conn, command):
     uid = session["user_id"]
-    conn.publish(f"robot:{uid}:commands", command)   # вместо глобального
+    conn.publish(f"user:{uid}:robot:commands", command)
 
 
 def chart_data():

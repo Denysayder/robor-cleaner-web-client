@@ -138,6 +138,21 @@ def api_settings():
     db.session.commit()
     return "", 204
 
+@app.route("/api/pipeline", methods=["POST"])
+@login_required
+def api_pipeline():
+    action = request.json.get("action")   # start|stop|status
+    uid    = session["user_id"]
+    svc    = f"robot-worker@{uid}"
+    if action == "start":
+        subprocess.run(["systemctl","start",svc], check=True)
+    elif action == "stop":
+        subprocess.run(["systemctl","stop",svc], check=True)
+    elif action == "status":
+        out = subprocess.check_output(["systemctl","is-active",svc]).decode().strip()
+        return jsonify({"status": out})
+    return "", 204
+
 
 if __name__ == "__main__":
     app.secret_key = Config.SECRET_KEY
