@@ -17,25 +17,34 @@ ROUND   = 6
 INTERVAL = 10           # секунд
 
 while True:
-    t = redis_conn.hgetall("telemetry")
-    if t:
+    # SCAN быстрее, чем KEYS * в большом Redis
+    for k in redis_conn.scan_iter("telemetry:*"):
+        t = redis_conn.hgetall(k)
+        if not t:
+            continue
+
+        user_id = int(t.get("user_id", 0))   # 👈 обязательно
+        if not user_id:
+            continue
+
         p_watt = f(t.get("sensor1"))
-        print(p_watt)
         gen = round(p_watt / 1000 * INTERVAL / 3600, ROUND)
-        print(gen)
-        if gen:
-            sav = round(gen * 0.15, ROUND)
-            ts = datetime.now(timezone.utc).replace(microsecond=0)
-            with engine.begin() as c:
-                c.execute(
-                    text(
-                        "INSERT INTO energy_stats "
-                        "(recorded_at, energy_generated_kwh, energy_saved_kwh) "
-                        "VALUES (:ts, :g, :s) "
-                        "ON DUPLICATE KEY UPDATE "
-                        "energy_generated_kwh = energy_generated_kwh + :g, "
-                        "energy_saved_kwh     = energy_saved_kwh     + :s"
-                    ),
-                    {"ts": ts, "g": gen, "s": sav},
-                )
+        if not gen:
+            continue
+
+        sav = round(gen * 0.15, ROUND)
+        ts  = datetime.now(timezone.utc).replace(microsecond=0)
+
+        with engine.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO energy_stats "
+                    "(user_id, recorded_at, energy_generated_kwh, energy_saved_kwh) "
+                    "VALUES (:uid, :ts, :g, :s) "
+                    "ON DUPLICATE KEY UPDATE "
+                    "energy_generated_kwh = energy_generated_kwh + :g, "
+                    "energy_saved_kwh     = energy_saved_kwh     + :s"
+                ),
+                {"uid": user_id, "ts": ts, "g": gen, "s": sav},
+            )
     time.sleep(INTERVAL)

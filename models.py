@@ -7,18 +7,39 @@ db = SQLAlchemy()
 
 class User(db.Model):
     __tablename__ = "users"
-
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
+    id            = db.Column(db.Integer, primary_key=True)
+    username      = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-    cleaning_logs = db.relationship(
-        "CleaningLog",
-        back_populates="user",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
+    energy_stats  = db.relationship("EnergyStat", back_populates="user",
+                                    cascade="all, delete-orphan")
+    cleaning_logs = db.relationship("CleaningLog", back_populates="user",
+                                    cascade="all, delete-orphan")
+    settings      = db.relationship("UserSettings", uselist=False, back_populates="user",
+                                    cascade="all, delete-orphan")
+
+
+class UserSettings(db.Model):
+    __tablename__ = "user_settings"
+    user_id = db.Column(db.Integer,
+                        db.ForeignKey("users.id", ondelete="CASCADE"),
+                        primary_key=True)
+    lat     = db.Column(db.Numeric(8, 5))
+    lon     = db.Column(db.Numeric(8, 5))
+    user    = db.relationship("User", back_populates="settings")
+
+
+class EnergyStat(db.Model):
+    __tablename__ = "energy_stats"
+    id                   = db.Column(db.BigInteger, primary_key=True)
+    user_id              = db.Column(db.Integer,
+                                     db.ForeignKey("users.id", ondelete="CASCADE"),
+                                     nullable=False, index=True)
+    recorded_at          = db.Column(db.DateTime, nullable=False)
+    energy_generated_kwh = db.Column(db.Numeric(12, 6), default=0)
+    energy_saved_kwh     = db.Column(db.Numeric(12, 6), default=0)
+    user                 = db.relationship("User", back_populates="energy_stats")
 
 
 class CleaningLog(db.Model):

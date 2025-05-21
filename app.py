@@ -12,12 +12,14 @@ from flask import (
     session,
     jsonify,
 )
+from models import UserSettings
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from config import Config
 from models import db, User, CleaningLog
 from services import weather_forecast, publish_robot, chart_data
 from stream import bp as stream_bp
+import subprocess
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -115,6 +117,27 @@ def api_robot():
     db.session.add(log)
     db.session.commit()
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/settings", methods=["GET", "PUT"])
+@login_required
+def api_settings():
+    uid = session["user_id"]
+
+    if request.method == "GET":
+        s = UserSettings.query.get(uid)
+        return jsonify({"lat": s.lat if s else None,
+                        "lon": s.lon if s else None})
+
+    data = request.get_json(force=True)
+    lat, lon = data.get("lat"), data.get("lon")
+
+    s = UserSettings.query.get(uid) or UserSettings(user_id=uid)
+    s.lat, s.lon = lat, lon
+    db.session.add(s)
+    db.session.commit()
+    return "", 204
+
 
 if __name__ == "__main__":
     app.secret_key = Config.SECRET_KEY

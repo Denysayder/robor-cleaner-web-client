@@ -5,17 +5,19 @@ from sqlalchemy.sql import text
 
 from config import Config
 from models import db
+from models import UserSettings
+from flask import session
 
 
 def weather_forecast(lat=None, lon=None):
-    lat = lat or Config.WEATHER_LAT
-    lon = lon or Config.WEATHER_LON
+    uid = session["user_id"]
+    settings = UserSettings.query.get(uid)
+    lat = lat or settings.lat or Config.WEATHER_LAT
+    lon = lon or settings.lon or Config.WEATHER_LON
+
     row = db.session.execute(
-        text(
-            "SELECT payload, fetched_at FROM weather_cache "
-            "WHERE lat=:lat AND lon=:lon LIMIT 1"
-        ),
-        {"lat": lat, "lon": lon},
+        text("SELECT payload, fetched_at FROM weather_cache WHERE user_id=:uid"),
+        {"uid": uid},
     ).first()
     if row and datetime.utcnow() - row.fetched_at < timedelta(minutes=30):
         return json.loads(row.payload)
@@ -28,31 +30,29 @@ def weather_forecast(lat=None, lon=None):
     data = resp.json()
     db.session.execute(
         text(
-            "INSERT INTO weather_cache (fetched_at, lat, lon, payload) "
-            "VALUES (:fetched_at, :lat, :lon, :payload) "
+            "INSERT INTO weather_cache (user_id, fetched_at, payload) "
+            "VALUES (:uid, :fetched_at, :payload) "
             "ON DUPLICATE KEY UPDATE fetched_at=:fetched_at, payload=:payload"
         ),
-        {
-            "fetched_at": datetime.utcnow(),
-            "lat": lat,
-            "lon": lon,
-            "payload": json.dumps(data),
-        },
+        {"uid": uid, "fetched_at": datetime.utcnow(), "payload": json.dumps(data)},
     )
     db.session.commit()
     return data
 
 
 def publish_robot(conn, command):
-    conn.publish("robot:commands", command)
+    uid = session["user_id"]
+    conn.publish(f"robot:{uid}:commands", command)   # вместо глобального
 
 
 def chart_data():
+    uid = session["user_id"]
     rows = db.session.execute(
         text(
             "SELECT recorded_at, energy_generated_kwh, energy_saved_kwh "
-            "FROM energy_stats ORDER BY recorded_at"
-        )
+            "FROM energy_stats WHERE user_id=:uid ORDER BY recorded_at"
+        ),
+        {"uid": uid},
     ).all()
     labels, generated, saved = [], [], []
     for recorded_at, gen_kwh, saved_kwh in rows:

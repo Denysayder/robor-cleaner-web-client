@@ -113,14 +113,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadChartData();
     loadWeather();
-    
+
     document.getElementById("editLocation").addEventListener("click", () => modal.show());
 
-    document.getElementById("saveLocation").addEventListener("click", () => {
-        localStorage.setItem("lat",  latInput.value);
-        localStorage.setItem("lon",  lonInput.value);
-        modal.hide();
-        loadWeather();
+// dashboard.js
+
+    document.getElementById("saveLocation").addEventListener("click", async () => {
+        const lat = parseFloat(document.getElementById("latInput").value);
+        const lon = parseFloat(document.getElementById("lonInput").value);
+
+        await fetch("/api/settings", {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({lat, lon})
+        });
+
+        bootstrap.Modal.getInstance(
+            document.getElementById("locationModal")
+        ).hide();
+
+        refreshWeather();
     });
 
 });
