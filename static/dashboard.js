@@ -1,14 +1,29 @@
-// static/dashboard.js
 document.addEventListener("DOMContentLoaded", () => {
     const modal      = new bootstrap.Modal(document.getElementById("locationModal"));
     const latInput   = document.getElementById("latInput");
     const lonInput   = document.getElementById("lonInput");
-    const storedLat  = localStorage.getItem("lat");
-    const storedLon  = localStorage.getItem("lon");
-    if (storedLat) latInput.value = storedLat;
-    if (storedLon) lonInput.value = storedLon;
-    const ctx = document.getElementById("energyChart").getContext("2d");
-    let energyChart = null;
+    const ctx        = document.getElementById("energyChart").getContext("2d");
+    let energyChart  = null;
+
+    // Загружаем сохранённые координаты с сервера
+    async function initSettings() {
+        try {
+            const res = await fetch("/api/settings");
+            if (!res.ok) return;
+
+            const s = await res.json();
+            if (s.lat !== null && s.lon !== null) {
+                latInput.value = s.lat;
+                lonInput.value = s.lon;
+                localStorage.setItem("lat", s.lat);
+                localStorage.setItem("lon", s.lon);
+            }
+
+            loadWeather(); // Загружаем погоду после установки координат
+        } catch (err) {
+            console.error("Ошибка при загрузке настроек:", err);
+        }
+    }
 
     async function loadChartData() {
         const res = await fetch("/api/chart-data");
@@ -47,8 +62,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function loadWeather() {
-        const lat = latInput.value || storedLat || "50.4501";
-        const lon = lonInput.value || storedLon || "30.5234";
+        const lat = latInput.value || localStorage.getItem("lat") || "50.4501";
+        const lon = lonInput.value || localStorage.getItem("lon") || "30.5234";
         const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
         if (!res.ok) return;
         const data = await res.json();
@@ -88,51 +103,60 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.querySelectorAll(".robot-cmd").forEach(btn => {
         btn.addEventListener("click", async () => {
-        const cmd = btn.dataset.cmd;
+            const cmd = btn.dataset.cmd;
+            try {
+                const resp = await fetch("/api/robot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({ command: cmd })
+                });
 
-        try {
-            const resp = await fetch("/api/robot", {
-            method : "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept"      : "application/json"
-            },
-            body   : JSON.stringify({ command: cmd })
-            });
-
-            if (!resp.ok) {
-            throw new Error(await resp.text());
+                if (!resp.ok) {
+                    throw new Error(await resp.text());
+                }
+            } catch (err) {
+                confirm("Error");
+                console.error(err);
+                alert(`Ошибка: ${err.message}`);
             }
-        } catch (err) {
-            confirm("Error");
-            console.error(err);
-            alert(`Ошибка: ${err.message}`);
-        }
         });
     });
-
-    loadChartData();
-    loadWeather();
 
     document.getElementById("editLocation").addEventListener("click", () => modal.show());
 
-// dashboard.js
-
     document.getElementById("saveLocation").addEventListener("click", async () => {
-        const lat = parseFloat(document.getElementById("latInput").value);
-        const lon = parseFloat(document.getElementById("lonInput").value);
+        const lat = parseFloat(latInput.value);
+        const lon = parseFloat(lonInput.value);
+
+        // сохранить в локальное хранилище
+        localStorage.setItem("lat", lat);
+        localStorage.setItem("lon", lon);
 
         await fetch("/api/settings", {
-        method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({lat, lon})
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat, lon })
         });
 
-        bootstrap.Modal.getInstance(
-            document.getElementById("locationModal")
-        ).hide();
-
-        refreshWeather();
+        bootstrap.Modal.getInstance(document.getElementById("locationModal")).hide();
+        loadWeather();
     });
 
+    document.getElementById("plan-btn").addEventListener("click", () => {
+        fetch("/api/best_cleaning_time")
+          .then(r => r.json())
+          .then(d => {
+            document.getElementById("plan-result").textContent =
+              `Рекомендовано: ${d.best_time}`;
+          })
+        .catch(() => alert("Не вдалося отримати рекомендацію"));
+    });
+
+
+    // Инициализация
+    initSettings();
+    loadChartData();
 });

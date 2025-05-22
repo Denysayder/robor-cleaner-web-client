@@ -38,7 +38,7 @@ def video_feed():
         return Response(status=403)
 
     def _gen(uid):
-        keys = (f"robot:{uid}:frame", f"video:{uid}")
+        keys = (f"user:{uid}:frame", f"user:{uid}:video")
         while True:
             frame = None
             for key in keys:

@@ -14,12 +14,14 @@ from flask import (
 )
 from models import UserSettings
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import text
 
 from config import Config
 from models import db, User, CleaningLog
 from services import weather_forecast, publish_robot, chart_data
 from stream import bp as stream_bp
 import subprocess
+from intelligent_planner import suggest_cleaning_time
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -135,6 +137,8 @@ def api_settings():
     s = UserSettings.query.get(uid) or UserSettings(user_id=uid)
     s.lat, s.lon = lat, lon
     db.session.add(s)
+    db.session.execute(text("DELETE FROM weather_cache WHERE user_id=:uid"),
+        {"uid": uid})
     db.session.commit()
     return "", 204
 
@@ -153,6 +157,15 @@ def api_pipeline():
         return jsonify({"status": out})
     return "", 204
 
+@app.route("/api/best_cleaning_time")
+@login_required
+def best_cleaning_time():
+    uid = session["user_id"]
+    settings = UserSettings.query.get(uid)
+    t = suggest_cleaning_time(settings.lat, settings.lon)
+    if t is None:
+        return jsonify(best_time="Немає безпечного вікна в найближчі 48 год.")
+    return jsonify(best_time=t.strftime("%d %b %Y %H:%M"))
 
 if __name__ == "__main__":
     app.secret_key = Config.SECRET_KEY

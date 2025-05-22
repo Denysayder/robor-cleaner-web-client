@@ -1,4 +1,6 @@
 flask
 flask_sqlalchemy
 redis
+sqlalchemy
+werkzeug
 requests
