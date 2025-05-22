@@ -14,16 +14,15 @@ def f(x):
         return 0.0
 
 ROUND   = 6
-INTERVAL = 10           # секунд
+INTERVAL = 10
 
 while True:
-    # SCAN быстрее, чем KEYS * в большом Redis
     for k in redis_conn.scan_iter("telemetry:*"):
         t = redis_conn.hgetall(k)
         if not t:
             continue
 
-        user_id = int(t.get("user_id", 0))   # 👈 обязательно
+        user_id = int(t.get("user_id", 0))
         if not user_id:
             continue
 

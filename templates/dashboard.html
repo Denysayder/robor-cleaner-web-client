@@ -1,11 +1,84 @@
 {% extends "layout.html" %}
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+<style>
+  /* === Futuristic glassmorphism (2025) === */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+  }
+
+  /* ===== Battery gauge enhanced ===== */
+  .battery-gauge {
+    position: relative;
+    width: 200px;
+    height: 200px;
+  }
+
+  .battery-gauge canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .battery-center {
+    position: absolute;
+    top: 65%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .battery-center svg {
+    width: 34px;
+    height: 18px;
+  }
+
+  .battery-perc {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1fa87c;
+    letter-spacing: 0.5px;
+    line-height: 1;
+  }
+
+  /* Camera stream image */
+  #robotStream {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Clean / dirty badge */
+  .status-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 0.45rem 1rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #fff;
+    border-radius: 2rem;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    text-transform: uppercase;
+    letter-spacing: 0.55px;
+  }
+</style>
+
 <h2 class="mb-4">Dashboard</h2>
 
 <div class="row g-4">
   <!-- График энергии -->
   <div class="col-lg-8">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm glass-card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>Energy Statistics</span>
         <button id="refreshChart" class="btn btn-sm btn-outline-primary">↻</button>
@@ -18,25 +91,20 @@
 
   <!-- Прогноз погоды + интеллектуальное планирование -->
   <div class="col-lg-4">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm glass-card">
       <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <span>Weather Forecast</span>
         <div class="btn-group ms-auto" role="group">
           <button id="editLocation" class="btn btn-sm btn-outline-secondary">
-            <img src="{{ url_for('static', filename='img/icon_position.svg') }}" alt="Location" style="height: 15px;">
+            <img src="{{ url_for('static', filename='img/icon_position.svg') }}" alt="Location" style="height: 15px;" />
           </button>
           <button id="refreshWeather" class="btn btn-sm btn-outline-primary">↻</button>
         </div>
       </div>
       <div class="card-body">
-        <div class="d-flex flex-column">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <button id="plan-btn" class="btn btn-sm btn-primary w-100">Перевірити найкращий час для запуску</button>
-          </div>
-          <div id="plan-result" class="text-muted text-center small mb-3"></div>
-          <ul id="weatherList" class="list-group small"></ul>
-        </div>
-
+        <button id="plan-btn" class="btn btn-sm btn-primary w-100 mb-2">Перевірити найкращий час для запуску</button>
+        <div id="plan-result" class="text-muted text-center small mb-3"></div>
+        <ul id="weatherList" class="list-group small"></ul>
         <!-- Модалка установки координат -->
         <div class="modal fade" id="locationModal" tabindex="-1" aria-hidden="true">
           <div class="modal-dialog">
@@ -48,11 +116,11 @@
               <div class="modal-body">
                 <div class="mb-3">
                   <label for="latInput" class="form-label">Latitude</label>
-                  <input type="number" step="0.0001" id="latInput" class="form-control">
+                  <input type="number" step="0.0001" id="latInput" class="form-control" />
                 </div>
                 <div class="mb-3">
                   <label for="lonInput" class="form-label">Longitude</label>
-                  <input type="number" step="0.0001" id="lonInput" class="form-control">
+                  <input type="number" step="0.0001" id="lonInput" class="form-control" />
                 </div>
               </div>
               <div class="modal-footer">
@@ -67,22 +135,40 @@
 </div>
 
 <!-- Управление роботом -->
-<div class="card mt-4 shadow-sm">
+<div class="card mt-4 shadow-sm glass-card">
   <div class="card-header">Robot Control</div>
   <div class="card-body d-flex justify-content-center">
     <div class="btn-group" role="group">
       <button class="btn btn-success robot-cmd" data-cmd="start_clean">Start Cleaning</button>
       <button class="btn btn-danger robot-cmd" data-cmd="stop_clean">Stop Cleaning</button>
-      <button class="btn btn-secondary robot-cmd" data-cmd="status">Get Status</button>
     </div>
   </div>
 </div>
 
-<!-- Поток с камеры -->
-<div class="card mt-4 shadow-sm">
+<!-- Поток с камеры и батарея -->
+<div class="card mt-4 shadow-sm glass-card">
   <div class="card-header">Robot Camera</div>
-  <div class="card-body text-center">
-    <img id="robotStream" src="{{ url_for('stream.video_feed') }}" class="img-fluid border rounded">
+  <div class="card-body p-0">
+    <div class="position-relative">
+      <!-- Video stream -->
+      <img id="robotStream" src="{{ url_for('stream.video_feed') }}" class="img-fluid" />
+
+      <!-- Чисто / грязно -->
+      <span id="cleanStatus" class="status-badge">--</span>
+
+      <!-- Battery gauge overlay -->
+      <div class="battery-gauge position-absolute bottom-0 end-0 m-3">
+        <canvas id="batteryChart" width="200" height="200"></canvas>
+        <div class="battery-center">
+          <!-- Simple SVG battery icon -->
+          <svg viewBox="0 0 28 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="22" height="10" rx="2" stroke="#1fa87c" stroke-width="2"/>
+            <rect x="24" y="4" width="3" height="4" rx="1" fill="#1fa87c"/>
+          </svg>
+          <span id="batteryLabel" class="battery-perc">100%</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

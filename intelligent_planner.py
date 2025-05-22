@@ -17,11 +17,11 @@ def suggest_cleaning_time(lat=None, lon=None):
         t = datetime.fromisoformat(times[i]).replace(tzinfo=TZ)
         if t < now:
             continue
-        if pops[i] >= 10:  # НЕ выбирать часы с осадками 10% и выше
+        if pops[i] >= 10:
             continue
         if 6 <= t.hour < 18:
             continue
         return t
 
-    return None  # Лучше вернуть None, если нет подходящего времени
+    return None
 

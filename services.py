@@ -26,7 +26,6 @@ def weather_forecast(lat=None, lon=None):
     if row and datetime.utcnow() - row.fetched_at < timedelta(minutes=30):
         return json.loads(row.payload)
 
-    # ­— запрос к внешнему API —
     url = Config.WEATHER_API_URL.format(lat=lat, lon=lon)
     params = {"apikey": Config.WEATHER_API_KEY} if Config.WEATHER_API_KEY else {}
     data = requests.get(url, params=params, timeout=5).json()

@@ -1,6 +1,7 @@
 from functools import wraps
 from datetime import datetime
 import json
+import shutil, os
 
 import redis
 from flask import (
@@ -26,6 +27,8 @@ from intelligent_planner import suggest_cleaning_time
 app = Flask(__name__)
 app.config.from_object(Config)
 app.register_blueprint(stream_bp)
+
+SYSTEMCTL = shutil.which("systemctl")
 
 @app.context_processor
 def inject_now():
@@ -145,17 +148,69 @@ def api_settings():
 @app.route("/api/pipeline", methods=["POST"])
 @login_required
 def api_pipeline():
-    action = request.json.get("action")   # start|stop|status
+    action = request.json.get("action")
     uid    = session["user_id"]
     svc    = f"robot-worker@{uid}"
+    if SYSTEMCTL is None:
+        if action == "status":
+            status = (redis_conn.get(f"user:{uid}:robot:state") or b"inactive").decode()
+            return jsonify({"status": status})
+        elif action in ("start", "stop"):
+            redis_conn.set(f"user:{uid}:robot:state",
+                           "active" if action == "start" else "inactive",
+                           ex=30)
+            return "", 204
+        return jsonify(error="unknown action"), 400
+
     if action == "start":
-        subprocess.run(["systemctl","start",svc], check=True)
+        subprocess.run([SYSTEMCTL, "start",svc], check=True)
     elif action == "stop":
-        subprocess.run(["systemctl","stop",svc], check=True)
+        subprocess.run([SYSTEMCTL, "stop",svc], check=True)
     elif action == "status":
-        out = subprocess.check_output(["systemctl","is-active",svc]).decode().strip()
+        out = subprocess.check_output([SYSTEMCTL, "is-active", svc]).decode().strip()
         return jsonify({"status": out})
+    else:
+        return jsonify(error="unknown action"), 400
     return "", 204
+
+@app.route("/api/telemetry")
+@login_required
+def api_telemetry():
+    """
+    Возвращает уровень заряда батареи.
+    • если worker активен — берём из Redis
+    • если worker неактивен или ключа нет — возвращаем 100 %
+    """
+    uid     = session["user_id"]
+    battery = 100.0
+
+    hash_key = f"user:{uid}:telemetry"
+    try:
+        value = redis_conn.hget(hash_key, "battery")
+        if value is not None:
+            battery = float(value)
+    except Exception:
+        pass
+
+    if battery == 100.0:
+        for key in (
+            f"user:{uid}:robot:battery",
+            f"user:{uid}:battery",
+        ):
+            raw = redis_conn.get(key)
+            if not raw:
+                continue
+            try:
+                if raw.startswith(b"{"):
+                    battery = float(json.loads(raw).get("battery", battery))
+                else:
+                    battery = float(raw)
+                break
+            except Exception:
+                continue
+
+    return jsonify({"battery": battery})
+
 
 @app.route("/api/best_cleaning_time")
 @login_required

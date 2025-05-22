@@ -32,3 +32,10 @@ body {
 .robot-cmd {
     min-width: 160px;
 }
+
+.battery-gauge   {position:relative; width:140px; height:140px;}
+.battery-gauge .label{
+  position:absolute; top:60%; left:50%;
+  transform:translate(-50%,-50%);
+  font-weight:600; font-size:1.4rem;
+}

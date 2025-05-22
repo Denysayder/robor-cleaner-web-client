@@ -155,6 +155,45 @@ document.addEventListener("DOMContentLoaded", () => {
         .catch(() => alert("Не вдалося отримати рекомендацію"));
     });
 
+        // ---------- батарея ----------
+    const battCtx   = document.getElementById("batteryChart").getContext("2d");
+    const battLbl   = document.getElementById("batteryLabel");
+    let   battChart = new Chart(battCtx, {
+    type: "doughnut",
+    data: { labels:["used", "left"],
+            datasets:[{data:[0,100], borderWidth:0, backgroundColor: ["#eee", "#4caf50"]}] },
+    options:{
+        rotation:-90,               // показываем как полукруг внизу
+        circumference:180,
+        cutout:"70%",
+        plugins:{legend:{display:false}, tooltip:{enabled:false}}
+    }});
+
+    async function pollBattery(){
+    // console.log("pollBattery called");
+    // 1)  Узнаём активен ли сервис робота
+    const svc = await fetch("/api/pipeline", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"status"})
+    }).then(r=>r.ok ? r.json() : {status:"inactive"});
+
+    let value = 100;
+    if (svc.status === "running") {
+        // 2)  Берём реальное значение из Redis
+        const res = await fetch("/api/telemetry");
+        if (res.ok) value = (await res.json()).battery;
+    }
+    // 3)  Обновляем чартик
+    battChart.data.datasets[0].data = [100 - value, value];
+    battChart.update();
+    battLbl.textContent = `${Math.round(value)}%`;
+    }
+    setInterval(pollBattery, 3000);   // опрос каждые 3 с
+    pollBattery();                    // первый вызов сразу
+    // ---------- конец батареи ----------
+
+
 
     // Инициализация
     initSettings();
