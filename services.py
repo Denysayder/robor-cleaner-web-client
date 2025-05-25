@@ -2,11 +2,12 @@ from datetime import datetime, timedelta
 import json
 import requests
 from sqlalchemy.sql import text
-
+import math
 from config import Config
 from models import db
 from models import UserSettings
 from flask import session
+from datetime import datetime, timedelta
 
 
 def weather_forecast(lat=None, lon=None):
@@ -49,22 +50,49 @@ def publish_robot(conn, command):
 
 def chart_data():
     uid = session["user_id"]
+
     rows = db.session.execute(
-        text(
-            "SELECT recorded_at, energy_generated_kwh, energy_saved_kwh "
-            "FROM energy_stats WHERE user_id=:uid ORDER BY recorded_at"
-        ),
+        text("""SELECT recorded_at,
+                       energy_generated_kwh,
+                       energy_saved_kwh
+                FROM energy_stats
+                WHERE user_id = :uid
+                ORDER BY recorded_at"""),
         {"uid": uid},
     ).all()
+
+    # ── если данных нет, соберём простой «заглушочный» ряд ─────────────
+    if not rows:
+        now       = datetime.utcnow()
+        labels    = []
+        generated = []
+        saved     = []
+        for h in range(24):                      # последние 24 ч
+            ts = now - timedelta(hours=23 - h)   # в порядке возрастания
+            labels.append(ts.strftime("%H:%M"))
+            g = round(max(0.0, 0.4 * math.sin((h - 6) * math.pi / 24)), 3)
+            s = round(g * 0.15, 3)               # «сэкономлено» 15 %
+            generated.append(g)
+            saved.append(s)
+        return {
+            "labels": labels,
+            "datasets": [
+                {"label": "Energy Generated (kWh)", "data": generated},
+                {"label": "Energy Saved (kWh)",     "data": saved},
+            ],
+        }
+
+    # ── обычный путь, если реальные записи есть ───────────────────────
     labels, generated, saved = [], [], []
     for recorded_at, gen_kwh, saved_kwh in rows:
         labels.append(recorded_at.strftime("%Y-%m-%d %H:%M"))
         generated.append(float(gen_kwh))
         saved.append(float(saved_kwh))
+
     return {
         "labels": labels,
         "datasets": [
             {"label": "Energy Generated (kWh)", "data": generated},
-            {"label": "Energy Saved (kWh)", "data": saved},
+            {"label": "Energy Saved (kWh)",     "data": saved},
         ],
     }

@@ -18,11 +18,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import text
 
 from config import Config
-from models import db, User, CleaningLog
+from models import db, User, CleaningLog, EventLog
 from services import weather_forecast, publish_robot, chart_data
 from stream import bp as stream_bp
 import subprocess
 from intelligent_planner import suggest_cleaning_time
+from event_logger import log_event
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -114,6 +115,7 @@ def api_robot():
     if not command:
         return jsonify({"error": "command required"}), 400
     publish_robot(redis_conn, command)
+    log_event("INFO", "robot", f"command «{command}» sent")
     log = CleaningLog(
         user_id=session["user_id"],
         command=command,
@@ -176,40 +178,19 @@ def api_pipeline():
 @app.route("/api/telemetry")
 @login_required
 def api_telemetry():
-    """
-    Возвращает уровень заряда батареи.
-    • если worker активен — берём из Redis
-    • если worker неактивен или ключа нет — возвращаем 100 %
-    """
-    uid     = session["user_id"]
-    battery = 100.0
+    uid = session["user_id"]
+    k = lambda name: f"user:{uid}:{name}"
+    data = redis_conn.hgetall(k("telemetry"))
 
-    hash_key = f"user:{uid}:telemetry"
-    try:
-        value = redis_conn.hget(hash_key, "battery")
-        if value is not None:
-            battery = float(value)
-    except Exception:
-        pass
+    # декодируем Redis hash целиком
+    decoded = {k.decode(): v.decode() for k, v in data.items()}
 
-    if battery == 100.0:
-        for key in (
-            f"user:{uid}:robot:battery",
-            f"user:{uid}:battery",
-        ):
-            raw = redis_conn.get(key)
-            if not raw:
-                continue
-            try:
-                if raw.startswith(b"{"):
-                    battery = float(json.loads(raw).get("battery", battery))
-                else:
-                    battery = float(raw)
-                break
-            except Exception:
-                continue
+    # если поле battery отсутствует, добавим заглушку
+    if "battery" not in decoded:
+        decoded["battery"] = "100"
 
-    return jsonify({"battery": battery})
+    return jsonify(decoded)
+
 
 
 @app.route("/api/best_cleaning_time")
@@ -221,6 +202,34 @@ def best_cleaning_time():
     if t is None:
         return jsonify(best_time="Немає безпечного вікна в найближчі 48 год.")
     return jsonify(best_time=t.strftime("%d %b %Y %H:%M"))
+
+@app.route("/api/event-log")
+@login_required
+def api_event_log():
+    # Отдаём последние 100 событий ТОЛЬКО текущего пользователя + системные (NULL)
+    uid   = session["user_id"]
+    rows  = (EventLog.query
+              .filter((EventLog.user_id == uid) | (EventLog.user_id == None))
+              .order_by(EventLog.created_at.desc())
+              .limit(100)
+              .all())
+    return jsonify([{
+        "ts":   row.created_at.strftime("%d.%m %H:%M:%S"),
+        "lvl":  row.level,
+        "comp": row.component,
+        "msg":  row.message[:140]  # короче для фронта
+    } for row in rows])
+
+# @app.route("/api/telemetry")
+# @login_required
+# def get_telemetry():
+#     uid = session["user_id"]
+#     k = lambda name: f"user:{uid}:{name}"
+#     data = redis_conn.hgetall(k("telemetry"))
+#     # декодуємо байти
+#     decoded = {k.decode(): v.decode() for k, v in data.items()}
+#     return jsonify(decoded)
+
 
 if __name__ == "__main__":
     app.secret_key = Config.SECRET_KEY
