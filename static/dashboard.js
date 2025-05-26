@@ -170,29 +170,81 @@ document.addEventListener("DOMContentLoaded", () => {
     }});
 
     async function pollBattery(){
-    // console.log("pollBattery called");
-    // 1)  Узнаём активен ли сервис робота
-    const svc = await fetch("/api/pipeline", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"status"})
-    }).then(r=>r.ok ? r.json() : {status:"inactive"});
+        // console.log("pollBattery called");
+        // 1)  Узнаём активен ли сервис робота
+        const svc = await fetch("/api/pipeline", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({action:"status"})
+        }).then(r=>r.ok ? r.json() : {status:"inactive"});
 
-    let value = 100;
-    if (svc.status === "running") {
-        // 2)  Берём реальное значение из Redis
-        const res = await fetch("/api/telemetry");
-        if (res.ok) value = (await res.json()).battery;
-    }
-    // 3)  Обновляем чартик
-    battChart.data.datasets[0].data = [100 - value, value];
-    battChart.update();
-    battLbl.textContent = `${Math.round(value)}%`;
+        let value = 100;
+        if (svc.status === "running") {
+            // 2)  Берём реальное значение из Redis
+            const res = await fetch("/api/telemetry");
+            if (res.ok) value = (await res.json()).battery;
+        }
+        // 3)  Обновляем чартик
+        battChart.data.datasets[0].data = [100 - value, value];
+        battChart.update();
+        battLbl.textContent = `${Math.round(value)}%`;
     }
     setInterval(pollBattery, 3000);   // опрос каждые 3 с
     pollBattery();                    // первый вызов сразу
     // ---------- конец батареи ----------
 
+    async function loadLog() {
+        const res = await fetch("/api/event-log");
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const list = document.getElementById("logList");
+        list.innerHTML = "";
+        data.forEach(r => {
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between gap-2";
+            li.innerHTML = `
+              <span class="text-muted">${r.ts}</span>
+              <span class="badge bg-${r.lvl === "ERROR" ? "danger" :
+                                      r.lvl === "WARN"  ? "warning" : "secondary"}">
+                    ${r.lvl}</span>
+              <span class="flex-grow-1 text-truncate">${r.comp}: ${r.msg}</span>`;
+            list.appendChild(li);
+        });
+    }
+
+    document.getElementById("refreshLog").addEventListener("click", loadLog);
+    loadLog();    // первый вызов
+
+    async function updateCleanStatus() {
+        const cleanStatusEl = document.getElementById("cleanStatus");
+
+        const svc = await fetch("/api/pipeline", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({action:"status"})
+        }).then(r=>r.ok ? r.json() : {status:"inactive"});
+
+        let value = "--";
+        if (svc.status === "running") {
+            // 2)  Берём реальное значение из Redis
+            const res = await fetch("/api/telemetry");
+            if (res.ok) value = (await res.json()).panelStatus;
+            if (value === "Clean") {
+                cleanStatusEl.style.backgroundColor = "rgba(30, 144, 255, 0.6)";  // синий
+                cleanStatusEl.textContent = "Clean";
+            } else if (value === "G") {
+                cleanStatusEl.style.backgroundColor = "rgba(220, 53, 69, 0.6)";   // красный
+                cleanStatusEl.textContent = "Dirty";
+            } else {
+                cleanStatusEl.style.backgroundColor = "rgba(0,0,0,0.45)";
+                cleanStatusEl.textContent = value;
+            }
+        }
+    }
+
+    updateCleanStatus();                // первый вызов
+    setInterval(updateCleanStatus, 1000);  // повторять каждые 5 сек
 
 
     // Инициализация

@@ -56,3 +56,16 @@ class CleaningLog(db.Model):
     issued_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship("User", back_populates="cleaning_logs")
+
+# models.py  (добавьте после CleaningLog)
+class EventLog(db.Model):
+    __tablename__ = "event_logs"
+
+    id         = db.Column(db.BigInteger, primary_key=True)
+    user_id    = db.Column(db.Integer,
+                           db.ForeignKey("users.id", ondelete="SET NULL"),
+                           nullable=True, index=True)
+    level      = db.Column(db.String(5),  nullable=False)   # INFO/WARN/ERROR
+    component  = db.Column(db.String(32), nullable=False)
+    message    = db.Column(db.Text,       nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

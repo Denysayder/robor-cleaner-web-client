@@ -106,7 +106,7 @@
         <div id="plan-result" class="text-muted text-center small mb-3"></div>
         <ul id="weatherList" class="list-group small"></ul>
         <!-- Модалка установки координат -->
-        <div class="modal fade" id="locationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal fade" id="locationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false" data-bs-keyboard="false">
           <div class="modal-dialog">
             <div class="modal-content">
               <div class="modal-header">
@@ -171,4 +171,16 @@
     </div>
   </div>
 </div>
+
+<!-- Журнал событий -->
+<div class="card mt-4 shadow-sm glass-card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Event Log</span>
+    <button id="refreshLog" class="btn btn-sm btn-outline-primary">↻</button>
+  </div>
+  <div class="card-body p-0" style="max-height:260px; overflow-y:auto;">
+    <ul id="logList" class="list-group list-group-flush small"></ul>
+  </div>
+</div>
+
 {% endblock %}
